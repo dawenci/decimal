@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "target": "ES2022",
+    "baseUrl": ".",
+    "allowJs": false,
+    "strict": true,
+    "noImplicitAny": true,
+    "removeComments": true,
+    "preserveConstEnums": true,
+    "noImplicitOverride": true,
+    "sourceMap": false,
+    "outDir": "dist",
+    "lib": ["DOM", "ESNext", ],
+  },
+  "include": [
+    "src",
+    "types",
+  ],
+}
