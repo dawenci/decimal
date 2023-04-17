@@ -9,7 +9,7 @@
     "removeComments": true,
     "preserveConstEnums": true,
     "noImplicitOverride": true,
-    "sourceMap": false,
+    "sourceMap": true,
     "outDir": "dist",
     "lib": ["DOM", "ESNext", ],
   },
