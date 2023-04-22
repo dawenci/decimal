@@ -1,8 +1,8 @@
-import { make } from '../core/make.js'
-import { Pipeable } from './pipe.js'
-import { mul as _mul } from '../fn/mul.js'
+import type { PipeableMaker } from './pipe.js'
+import { make } from '../core/index.js'
+import { mul as _mul } from '../fn/index.js'
 
-export const mul: Pipeable = (rhs: any) => {
-  const _rhs = make(rhs)
-  return lhs => _mul(lhs, _rhs)
+export const mul: PipeableMaker = rhs => {
+  const partial = make(rhs)
+  return lhs => _mul(lhs, partial)
 }

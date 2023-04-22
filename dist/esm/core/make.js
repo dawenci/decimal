@@ -17,6 +17,8 @@ function parse(raw) {
         return 1 / raw > 0 ? new Decimal([], 1, 0) : new Decimal([], 1, 0 | 128);
     }
     var str = String(raw).replace(/\s+/g, '').toLowerCase();
+    if (str[0] === '+')
+        str = str.slice(1);
     if (str[0] === '.')
         str = '0' + str;
     var len = str.length;
@@ -137,7 +139,7 @@ export function make(raw) {
     var init = parse(raw);
     return new Decimal(init.digits, init.dpp, init.flag);
 }
-export function make2(digits, dpp, flag) {
+export function make_by_data(digits, dpp, flag) {
     var ret = new Decimal(digits, dpp, flag);
     strip_zeros(ret);
     return ret;

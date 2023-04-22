@@ -1,3 +1,4 @@
+import { RoundingMode } from './rounding.js';
 export declare const enum Flag {
     Neg = 128,
     Nan = 1,
@@ -8,16 +9,16 @@ export interface DecimalData {
     dpp: number;
     flag: number;
 }
-export declare enum RoundingMode {
-    Up = 0,
-    Down = 1,
-    Ceiling = 2,
-    Floor = 3,
-    HalfUp = 4,
-    HalfDown = 5,
-    HalfEven = 6,
-    HalfCeiling = 7,
-    HalfFloor = 8
+export interface PrintOptions {
+    rounding?: RoundingMode;
+    expThresholdPos?: number;
+    expThresholdNeg?: number;
+}
+export interface ToPrecisionOptions extends PrintOptions {
+    significantDigits?: number;
+}
+export interface ToExponentialOptions extends PrintOptions {
+    fractionDigits?: number;
 }
 export declare class Decimal implements DecimalData {
     digits: number[];
@@ -25,11 +26,6 @@ export declare class Decimal implements DecimalData {
     flag: number;
     constructor(digits?: number[], dpp?: number, flag?: number);
     clone(): Decimal;
-    getDecimalPlaces(): number;
-    getIntegerCount(): number;
-    get(index: number): number;
-    getPoint(): number;
-    toArray(): any[];
     isInt(): boolean;
     isSafeInt(): boolean;
     isNeg(): boolean;
@@ -37,13 +33,31 @@ export declare class Decimal implements DecimalData {
     isInfinity(): boolean;
     isZero(): boolean;
     isOne(): boolean;
-    setNeg(v: boolean): this;
-    toggleNeg(): this;
-    moveDpp(n: number): this;
     toNumber(): number;
-    getPrecision(): number;
-    setPrecision(significantDigits: number, roundingMode?: RoundingMode): this;
-    toPrecision(significantDigits?: number, roundingMode?: RoundingMode): string;
+    setPrecision(significantDigits?: number, roundingMode?: RoundingMode): this;
+    toPrecision(): string;
+    toPrecision(significantDigits: number): string;
+    toPrecision(printOptions: ToPrecisionOptions): string;
+    toExponential(): string;
+    toExponential(fractionDigits: number): string;
+    toExponential(printOptions: ToExponentialOptions): string;
     toString(): string;
+    _setNeg(v: boolean): this;
+    _toggleNeg(): this;
+    _moveDpp(n: number): this;
+    _getFractionCount(): number;
+    _getIntegerCount(): number;
+    _indexRange(): [number, number];
+    _digitCount(): number;
+    _getDigit(index: number): number;
+    _setDigit(index: number, value: number): this;
+    _sliceDigits(significantDigits: number): this;
+    _joinDigits(): string;
+    _appendFront(value: number): this;
+    _appendBack(value: number): this;
+    _popBack(): number | undefined;
+    _popFront(): number | undefined;
+    _get(index: number): number;
+    _getPoint(): number;
 }
 export type t = Decimal;

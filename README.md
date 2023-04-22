@@ -62,16 +62,6 @@ class Decimal {
   isOne(): boolean
 
   /**
-   * Set positive and negative symbols.
-   */
-  setNeg(value: boolean): this
-
-  /**
-   * Toogle positive and negative symbols.
-   */
-  toggleNeg(): this
-
-  /**
    * To JavaScript number.
    */
   toNumber(): number
@@ -181,42 +171,13 @@ setPrecision(): Decimal
 ```
 
 
-#### Decimal.prototype.toggleNeg
-
-type
-
-```ts
-toggleNeg(): this
-```
-
-example
-
-```ts
-make(3.14).toggleNeg().toNumber() // -3.14
-```
-
-
-#### Decimal.prototype.setNeg
-
-type
-
-```ts
-setNeg(value: boolean): this
-```
-
-example
-```ts
-make(3.14).setNeg(true).toNumber() // -3.14
-```
-
-
 ### Pipeable API
 
 type
 
 ```ts
-type Pipeable = (rightHandSide: any) => (leftHandSide: Decimal) => Decimal
-type Pipe = (any: any, ...fns: ReturnType<Pipeable>[]) => Decimal
+type Pipeable = (decimal: Decimal) => Decimal
+type Pipe = (any: any, ...fns: Pipeable[]) => Decimal
 
 const pipe: Pipe
 ```
@@ -289,6 +250,17 @@ example
 pipe(3, mod(2)).toNumber() // 1
 ```
 
+#### neg
+
+Toogle positive and negative symbols.
+
+example
+
+```ts
+pipe(3.14, neg).toNumber() // -3.14
+pipe(-3.14, neg).toNumber() // 3.14
+```
+
 ##### tap
 
 type
@@ -302,3 +274,25 @@ example
 ```ts
 pipe(3, n => console.log(n.toNumber())) // print 3
 ```
+
+
+## change log
+
+### v0.2.0
+
+- 模块导出方式变更，新增导出 fn 下的函数（在 fn 命名空间下）
+- 增加 Setting 模块，可以配置全局的 precision、rounding 模式、转换指数计数法的阈值等。
+- make 函数支持更多输入
+- pipeable 相关类型调整
+- 函数 fn/add、fn/sub、fn/mul、fn/div、fn/mod 等返回 Decimal 实例的函数，会对结果应用 precision、rounding
+- 函数 fn/div 和 pipeable/div 语义、参数重新设计
+- 函数 pipeable/precision 新增 roundingMode 参数
+- 新函数 fn/abs 和 pipeable/abs
+- 新函数 fn/pi，用来生成指定精度的 π
+- 新函数 pipeable/cmp
+- 新函数 pipealbe/neg
+- 函数 pipeable/sub、pipeable/div、pipeable/mod 支持传入占位符交换两个二元运算操作数的顺序
+- Decimal.prototype.toPrecision 方法重新设计（语义更新）
+- Decimal.prototype.toString 方法重新设计（语义更新）
+- Decimal.prototype.toggleNeg 方法移除
+- Decimal.prototype.setNeg 方法移除

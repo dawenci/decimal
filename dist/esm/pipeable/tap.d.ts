@@ -1,2 +1,2 @@
-import { Pipeable } from './pipe.js';
-export declare const tap: Pipeable;
+import type { PipeableMaker } from './pipe.js';
+export declare const tap: PipeableMaker;

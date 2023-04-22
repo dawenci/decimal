@@ -1,19 +1,20 @@
-import { make, make2, NAN, INFINITY, NEG_INFINITY, ZERO, NEG_ZERO } from '../core/make.js';
+import { Setting, make, NAN, INFINITY, NEG_INFINITY, ZERO, NEG_ZERO } from '../core/index.js';
+import { make_by_data } from '../core/make.js';
 import { cmp } from './cmp.js';
-import { add } from './add.js';
-export function _sub(lhs, rhs) {
+import { _add } from './add.js';
+export function _sub(lhs, rhs, precision) {
     var neg1 = lhs.isNeg();
     var neg2 = rhs.isNeg();
     if (neg1 && neg2) {
-        var temp = rhs.clone().setNeg(false);
-        rhs = lhs.clone().setNeg(false);
+        var temp = rhs.clone()._setNeg(false);
+        rhs = lhs.clone()._setNeg(false);
         lhs = temp;
     }
     if (neg1 && !neg2) {
-        return add(lhs, rhs.clone().setNeg(true));
+        return _add(lhs, rhs.clone()._setNeg(true), precision);
     }
     if (!neg1 && neg2) {
-        return add(lhs, rhs.clone().setNeg(false));
+        return _add(lhs, rhs.clone()._setNeg(false), precision);
     }
     var cmpResult = cmp(lhs, rhs);
     if (cmpResult === 0)
@@ -25,23 +26,71 @@ export function _sub(lhs, rhs) {
         lhs = temp;
         retNeg = 0 | 128;
     }
-    var dp = Math.max(lhs.getDecimalPlaces(), rhs.getDecimalPlaces());
-    var len = Math.max(lhs.getIntegerCount(), rhs.getIntegerCount());
-    var carry = 0;
+    var lFracCount = lhs._getFractionCount();
+    var rFracCount = rhs._getFractionCount();
+    var fracCount = Math.max(lFracCount, rFracCount);
+    var lIntCount = lhs._getIntegerCount();
+    var begin = -fracCount;
+    var end = lIntCount;
+    if (lhs.dpp !== rhs.dpp) {
+        if (lhs.dpp - rhs.dpp >= precision) {
+            var d = lhs.dpp - lhs._digitCount() - rhs.dpp;
+            if (d >= 0) {
+                var ret_1 = lhs.clone();
+                var i = ret_1._digitCount();
+                var borrow_1 = 0;
+                while (i--) {
+                    var v = ret_1._getDigit(i) - (1 + borrow_1);
+                    borrow_1 = 0;
+                    if (v < 0) {
+                        ret_1._setDigit(i, v + 10);
+                        borrow_1 = 1;
+                        continue;
+                    }
+                    else {
+                        ret_1._setDigit(i, v);
+                        break;
+                    }
+                }
+                if (ret_1._getDigit(0) === 0) {
+                    ret_1._popFront();
+                    ret_1.dpp -= 1;
+                }
+                var c = Math.min(d, precision - ret_1._digitCount());
+                while (c-- > 0) {
+                    ret_1._appendBack(9);
+                }
+                if (d === 0) {
+                    if (rhs._digitCount() > 1) {
+                        ret_1._appendBack(9 - rhs._getDigit(0));
+                        ret_1._appendBack(1);
+                    }
+                    else {
+                        ret_1._appendBack(10 - rhs._getDigit(0));
+                    }
+                }
+                else {
+                    ret_1._appendBack(9);
+                }
+                return ret_1._setNeg(!!retNeg);
+            }
+        }
+    }
+    var borrow = 0;
     var digits = [];
-    for (var i = -dp, maxLen = len; i < maxLen; ++i) {
-        var r = lhs.get(i) - (rhs.get(i) + carry);
-        carry = 0;
+    for (var i = begin; i < end; ++i) {
+        var r = lhs._get(i) - (rhs._get(i) + borrow);
+        borrow = 0;
         if (r < 0) {
             digits.push(r + 10);
-            carry = 1;
+            borrow = 1;
         }
         else {
             digits.push(r);
         }
     }
     digits.reverse();
-    var ret = make2(digits, digits.length - dp, retNeg);
+    var ret = make_by_data(digits, digits.length - fracCount, retNeg);
     return ret;
 }
 export function sub(lhs, rhs) {
@@ -66,13 +115,13 @@ export function sub(lhs, rhs) {
                 return NEG_ZERO;
             return ZERO;
         }
-        return rhs.clone().toggleNeg();
+        return rhs.clone()._toggleNeg();
     }
     if (rhs.isZero())
         return lhs.clone();
-    if (lhs.isInt() && rhs.isInt() && lhs.getIntegerCount() < 16 && rhs.getIntegerCount() < 16) {
+    if (lhs.isInt() && rhs.isInt() && lhs._getIntegerCount() < 16 && rhs._getIntegerCount() < 16) {
         return make(lhs.toNumber() - rhs.toNumber());
     }
-    return _sub(lhs, rhs);
+    return _sub(lhs, rhs, Setting.precision);
 }
 //# sourceMappingURL=sub.js.map

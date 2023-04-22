@@ -1,5 +1,5 @@
-import { make } from '../../src/core/make'
-import { cmp } from '../../src/fn/cmp'
+import { make, RoundingMode, Setting, mergeSetting } from '../../../src/core/index'
+import { cmp } from '../../../src/fn/cmp'
 
 describe('fn/cmp', () => {
   it('cmp(NaN)', () => {

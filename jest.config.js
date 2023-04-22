@@ -1,10 +1,10 @@
-module.exports = {
+export default {
   // 支持 ts 文件中，使用 `.js` 后缀 import 模块
   resolver: "ts-jest-resolver",
   moduleFileExtensions: ['js', 'ts'],
   // 匹配 ts 文件
   transform: {
-    '^.+\\.[jt]s$': 'ts-jest'
+    '^.+\\.[jt]s$': ['ts-jest', { useEsm: true }],
   },
   // 忽略的目录
   transformIgnorePatterns: [ '/node_modules/' ],

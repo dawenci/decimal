@@ -1,8 +1,12 @@
-import { make } from '../core/make.js'
-import { Pipeable } from './pipe.js'
-import { sub as _sub } from '../fn/sub.js'
+import type { PipeableMaker } from './pipe.js'
+import type { Placeholder } from './placeholder.js'
+import { _ } from './placeholder.js'
+import { make } from '../core/index.js'
+import { sub as _sub } from '../fn/index.js'
 
-export const sub: Pipeable = (rhs: any) => {
-  const _rhs = make(rhs)
-  return lhs => _sub(lhs, _rhs)
+export const sub: PipeableMaker = (rhs, __?: Placeholder) => {
+  const partial = make(rhs)
+  return __ === _
+    ? rhs => _sub(partial, rhs)
+    : lhs => _sub(lhs, partial)
 }

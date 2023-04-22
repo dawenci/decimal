@@ -1,2 +1,2 @@
-import type { t } from '../core/decimal.js';
-export declare function div(lhs: t, rhs: t, fracCount?: number): t;
+import type { t } from '../core/index.js';
+export declare function div(lhs: t, rhs: t): t;

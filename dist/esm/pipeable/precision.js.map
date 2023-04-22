@@ -1,1 +1,1 @@
-{"version":3,"file":"precision.js","sourceRoot":"","sources":["../../../src/pipeable/precision.ts"],"names":[],"mappings":"AAEA,MAAM,CAAC,IAAM,SAAS,GAAa,UAAC,CAAS;IAC3C,OAAO,UAAA,CAAC,IAAI,OAAA,CAAC,CAAC,KAAK,EAAE,CAAC,YAAY,CAAC,CAAC,CAAC,EAAzB,CAAyB,CAAA;AACvC,CAAC,CAAA"}
+{"version":3,"file":"precision.js","sourceRoot":"","sources":["../../../src/pipeable/precision.ts"],"names":[],"mappings":"AAGA,MAAM,CAAC,IAAM,SAAS,GAAkB,UAAC,iBAAyB,EAAE,YAA2B;IAC7F,OAAO,UAAA,CAAC,IAAI,OAAA,CAAC,CAAC,KAAK,EAAE,CAAC,YAAY,CAAC,iBAAiB,EAAE,YAAY,CAAC,EAAvD,CAAuD,CAAA;AACrE,CAAC,CAAA"}

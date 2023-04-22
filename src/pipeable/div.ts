@@ -1,8 +1,18 @@
-import { make } from '../core/make.js'
-import { Pipeable } from './pipe.js'
-import { div as _div } from '../fn/div.js'
+import type { Pipeable } from './pipe.js'
+import type { RoundingMode } from '../core/index.js'
+import type { Placeholder } from './placeholder.js'
+import { _ } from './placeholder.js'
+import { make } from '../core/index.js'
+import { div as div_ } from '../fn/index.js'
 
-export const div: Pipeable = (rhs: any) => {
-  const _rhs = make(rhs)
-  return lhs => _div(lhs, _rhs)
+export interface DivOptions {
+  precision: number
+  rounding?: RoundingMode
+}
+
+export function div(rhs: any, __?: Placeholder): Pipeable {
+  const partial = make(rhs)
+  return __ === _
+    ? rhs => div_(partial, rhs)
+    : lhs => div_(lhs, partial)
 }

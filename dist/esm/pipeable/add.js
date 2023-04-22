@@ -1,7 +1,7 @@
-import { make } from '../core/make.js';
-import { add as _add } from '../fn/add.js';
+import { make } from '../core/index.js';
+import { add as _add } from '../fn/index.js';
 export var add = function (rhs) {
-    var _rhs = make(rhs);
-    return function (lhs) { return _add(lhs, _rhs); };
+    var partial = make(rhs);
+    return function (lhs) { return _add(lhs, partial); };
 };
 //# sourceMappingURL=add.js.map

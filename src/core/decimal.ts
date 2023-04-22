@@ -1,3 +1,6 @@
+import { RoundingMode } from './rounding.js'
+import { Setting, mergeSetting } from './setting.js'
+
 export const enum Flag {
   Neg = 0b10000000,
   Nan = 0b00000001,
@@ -41,83 +44,18 @@ export interface DecimalData {
   flag: number
 }
 
-/**
- * 0 - 6 与 Java 中的 BigDecimal 的 RoundingMode 一致。
- */
-export enum RoundingMode {
-  /**
-   * 负 <- - - 0 - - -> 正
-   * ---------------------
-   * 精度保留的末位，朝远离 0 的方向进位，即整数往 Infinity 方向，负数往 -Infinity 方向进位。
-   * 如 0.333，保留 2 位小数，结果：0.34
-   * 如 -0.333，保留 2 位小数，结果：-0.34
-   */
-  Up = 0,
+export interface PrintOptions {
+  rounding?: RoundingMode
+  expThresholdPos?: number
+  expThresholdNeg?: number
+}
 
-  /**
-   * 负 -> - - 0 - - <- 正
-   * ---------------------
-   * 直接截断无需进位。
-   * 如 0.555，保留 2 位小数，结果：0.55
-   */
-  Down = 1,
+export interface ToPrecisionOptions extends PrintOptions {
+  significantDigits?: number
+}
 
-  /**
-   * 负 -> - - 0 - - -> 正
-   * ---------------------
-   * 精度保留的末位，不论正负数，均朝 Infinity 方向进位。即正数远离 0 方向进位，负数直接截断。
-   */
-  Ceiling = 2,
-
-  /**
-   * 负 <- - - 0 - - <- 正
-   * ---------------------
-   * 精度保留的末位，不论正负数，均朝 -Infinity 方向进位。即负数远离 0 方向进位，正数直接截断。
-   */
-  Floor = 3,
-
-  /**
-   *
-   * 正数     ->
-   * <- - - half - - ->
-   * ------------------
-   *
-   * 负数     <-
-   * <- - - half - - ->
-   * ------------------
-   *
-   * 远离 0 的方向四舍五入。
-   */
-  HalfUp = 4,
-
-  /**
-   * 正数     <-
-   * <- - - half - - ->
-   * ------------------
-   *
-   * 负数     ->
-   * <- - - half - - ->
-   * ------------------
-   *
-   * 远离 0 的方向五舍六入。
-   * 注意：舍去部分的最高位等于 5 的时候，如果舍去部分还有不为零的数，也仍然需要进位。
-   */
-  HalfDown = 5,
-
-  /**
-   * 银行家舍入，舍入位非 5，则四舍六入，否则根据保留的末位是奇数还是偶数，奇进偶舍。
-   */
-  HalfEven = 6,
-
-  /**
-   * 朝 Infinity 方向四舍五入。
-   */
-  HalfCeiling = 7,
-
-  /**
-   * 朝 Infinity 方向五舍六入。
-   */
-  HalfFloor = 8,
+export interface ToExponentialOptions extends PrintOptions {
+  fractionDigits?: number
 }
 
 const MAX_SAFE_INTEGER_ARR = String(Number.MAX_SAFE_INTEGER)
@@ -130,9 +68,12 @@ const MIN_SAFE_INTEGER_ARR = String(Number.MIN_SAFE_INTEGER)
   .map(n => +n)
   .reverse()
 
+// TODO，数据结构优化，改成压位存储
 // 处理十进制数字，其他进制的需要先转换成十进制后再使用
 export class Decimal implements DecimalData {
-  constructor(public digits: number[] = [], public dpp = 1, public flag = 0) {}
+  constructor(public digits: number[] = [], public dpp = 1, public flag = 0) {
+
+  }
 
   /**
    * 获取一份对象深拷贝
@@ -141,60 +82,11 @@ export class Decimal implements DecimalData {
     return new Decimal(this.digits.slice(), this.dpp, this.flag)
   }
 
-  /** 有多少位有效小数 */
-  getDecimalPlaces(): number {
-    const n = this.digits.length - this.dpp
-    return n > 0 ? n : 0
-  }
-
-  /**
-   * 有多少位整数
-   * 取值大于等于 1（0.x 算 1 个整数 0）
-   */
-  getIntegerCount(): number {
-    return this.dpp > 0 ? this.dpp : 1
-  }
-
-  /**
-   * 0 为个位数，1 为十位数…
-   * -1 为小数第一位，-2 为小数第二位…
-   */
-  get(index: number): number {
-    return this.digits[this.dpp - 1 - index] || 0
-  }
-
-  /**
-   * 从左往右算，小数点的位置
-   */
-  getPoint(): number {
-    return this.dpp
-  }
-
-  /**
-   * 获取完整的数字序列
-   */
-  toArray() {
-    const digits = this.digits.slice()
-
-    // 小数点小于等于 0，则前面需要补零，小数点位置大于 digits.length，则需要在后面补零
-    if (this.dpp <= 0) {
-      return Array(-this.dpp + 1)
-        .fill(0)
-        .concat(digits)
-    }
-
-    if (this.dpp > digits.length) {
-      return digits.concat(Array(this.dpp - digits.length).fill(0))
-    }
-
-    return digits
-  }
-
   /**
    * 是否整数
    */
   isInt(): boolean {
-    return this.getDecimalPlaces() === 0
+    return this._getFractionCount() === 0
   }
 
   /**
@@ -202,13 +94,13 @@ export class Decimal implements DecimalData {
    */
   isSafeInt(): boolean {
     if (!this.isInt()) return false
-    const n = this.getIntegerCount()
+    const n = this._getIntegerCount()
     if (this.isNeg()) {
       let len = MAX_SAFE_INTEGER_ARR.length
       if (n > len) return false
       if (n < len) return true
       while (len--) {
-        if (this.get(len) > MAX_SAFE_INTEGER_ARR[len]) return false
+        if (this._get(len) > MAX_SAFE_INTEGER_ARR[len]) return false
       }
       return true
     } else {
@@ -216,7 +108,7 @@ export class Decimal implements DecimalData {
       if (n > len) return false
       if (n < len) return true
       while (len--) {
-        if (this.get(len) > MIN_SAFE_INTEGER_ARR[len]) return false
+        if (this._get(len) > MIN_SAFE_INTEGER_ARR[len]) return false
       }
       return true
     }
@@ -247,42 +139,14 @@ export class Decimal implements DecimalData {
    * 是否数字 +-0
    */
   isZero(): boolean {
-    return !this.digits.length && this.dpp === 1
+    return this.dpp === 1 && this._digitCount() === 0
   }
 
   /**
    * 是否数字 1
    */
   isOne(): boolean {
-    return this.digits.length === 1 && this.digits[0] === 1 && this.dpp === 1
-  }
-
-  /**
-   * 设置正负值
-   */
-  setNeg(v: boolean): this {
-    if (v) {
-      this.flag |= Flag.Neg
-    } else if (this.flag & Flag.Neg) {
-      this.flag ^= Flag.Neg
-    }
-    return this
-  }
-
-  /**
-   * 反转正负数
-   */
-  toggleNeg(): this {
-    this.setNeg(!this.isNeg())
-    return this
-  }
-
-  /**
-   * 移动 dpp
-   */
-  moveDpp(n: number) {
-    if (this.digits.length) this.dpp += n
-    return this
+    return this.dpp === 1 && this._digitCount() === 1 && this._get(0) === 1
   }
 
   /**
@@ -292,41 +156,25 @@ export class Decimal implements DecimalData {
     if (this.isNaN()) return NaN
     if (this.isInfinity()) return this.isNeg() ? -Infinity : Infinity
     if (this.isZero()) return this.isNeg() ? -0 : 0
-
-    const digits: any[] = this.toArray()
-    // 存在小数点
-    if (this.getDecimalPlaces()) {
-      if (digits[0] === 0) {
-        digits.splice(1, 0, '.')
-      } else {
-        digits.splice(this.dpp, 0, '.')
-      }
-    }
-    return Number((this.isNeg() ? '-' : '') + digits.join(''))
-  }
-
-  /**
-   * 获取有效数字数量
-   */
-  getPrecision(): number {
-    const len = this.digits.length
-    if (len) return len
-    return this.isNaN() || this.isInfinity() ? 0 : 1
+    return +this.toString()
   }
 
   /**
    * 设置有效数字数量
    * 必须是大于等于 1，且小于等于当前的 precision
    */
-  setPrecision(significantDigits: number, roundingMode: RoundingMode = RoundingMode.HalfEven): this {
+  setPrecision(significantDigits?: number, roundingMode?: RoundingMode): this {
+    if (significantDigits == null) significantDigits = Setting.precision
+    if (roundingMode == null) roundingMode = Setting.rounding
+
     if (significantDigits < 1) return this
 
-    const len = this.digits.length
+    const len = this._digitCount()
     if (len > significantDigits) {
       // 舍弃位，四舍五入等策略时，需要用来做比较
-      const n = this.digits[significantDigits]
+      const n = this._getDigit(significantDigits)
 
-      this.digits = this.digits.slice(0, significantDigits)
+      this._sliceDigits(significantDigits)
 
       let carry = false
       switch (roundingMode) {
@@ -354,7 +202,7 @@ export class Decimal implements DecimalData {
           break
         }
         case RoundingMode.HalfEven: {
-          carry = n >= 6 || (n === 5 && this.digits[significantDigits - 1] % 2 === 1)
+          carry = n >= 6 || (n === 5 && (len - significantDigits > 1 || this._getDigit(significantDigits - 1) % 2 === 1))
           break
         }
         case RoundingMode.HalfCeiling: {
@@ -370,28 +218,40 @@ export class Decimal implements DecimalData {
 
       // 需要进位
       if (carry) {
-        let i = this.digits.length
+        let i = this._digitCount()
         let c = false
         while (i--) {
           c = false
-          if (++this.digits[i] < 10) {
+          const new_val = this._getDigit(i) + 1
+          if (new_val < 10) {
+            this._setDigit(i, new_val)
             break
           }
-          this.digits[i] -= 10
+          this._setDigit(i, new_val - 10)
           c = true
         }
         // 最高位也发生了进位
         if (c) {
-          this.digits.unshift(1)
-          this.moveDpp(1)
+          this._appendFront(1)
+          this._moveDpp(1)
         }
 
         // 移除末尾 0
-        let j = this.digits.length
+        let j = this._digitCount()
         while (j--) {
-          if (this.digits[j] !== 0) break
-          this.digits.pop()
+          if (this._getDigit(j) !== 0) break
+          this._popBack()
         }
+      }
+
+      // 处理完毕后，digits 末尾可能存在 0，清理无效 0
+      let i = this._digitCount()
+      while (i--) {
+        if (this._getDigit(i) === 0) {
+          this._popBack()
+          continue
+        }
+        break
       }
     }
     return this
@@ -399,61 +259,305 @@ export class Decimal implements DecimalData {
 
   /**
    * 按照指定 precision 打印结果字符串
-   * 与 Js 不一样的是，-0 的负号会保留
+   * 注意：与 Number.prototype.toPrecision 不一样的地方是，该方法区分正负 0
    */
-  toPrecision(significantDigits?: number, roundingMode?: RoundingMode): string {
-    if (significantDigits == null || significantDigits < 1 || this.isNaN() || this.isInfinity()) return this.toString()
-
+  toPrecision(): string
+  toPrecision(significantDigits: number): string
+  toPrecision(printOptions: ToPrecisionOptions): string
+  toPrecision(arg?: number | ToPrecisionOptions): string {
+    if (this.isNaN()) return 'NaN'
+    if (this.isInfinity()) return this.isNeg() ? '-Infinity' : 'Infinity'
     if (this.isZero()) {
+      let sd = typeof arg === 'number' ? arg : 1
       let str = `${this.isNeg() ? '-' : ''}0`
-      if (significantDigits > 1) {
-        str += '.'
-        while (--significantDigits) {
-          str += '0'
-        }
-      }
+      if (sd > 1) str += '.' + _repeat('0', sd - 1)
       return str
     }
 
-    let str = this.clone().setPrecision(significantDigits, roundingMode).toString()
-
-    let len = str.length
-    if (str[0] === '-') len -= 1
-    if (/^-?0/.test(str)) len -= 1
-    const hasPoint = str.indexOf('.') !== -1
-    if (hasPoint) len -= 1
-
-    if (len < significantDigits) {
-      if (!hasPoint) {
-        str += '.'
-      }
-      while (len++ < significantDigits) {
-        // 末尾补零
-        str += '0'
-      }
+    let sd: number
+    let opt: ToPrecisionOptions
+    if (typeof arg === 'number') {
+      sd = arg
+      opt = {}
+    } else if (arg) {
+      opt = arg as ToPrecisionOptions
+      sd = opt.significantDigits ?? this._digitCount()
+    } else {
+      sd = this._digitCount()
+      opt = {}
     }
 
-    return str
+    if (sd < 1) {
+      sd = this._digitCount() || 1
+    }
+
+    const decimal = this.clone().setPrecision(sd, opt.rounding)
+
+    return _print(
+      decimal,
+      opt.expThresholdPos,
+      opt.expThresholdNeg,
+      sd,
+    )
+  }
+
+  /**
+   * 注意：与 Number.prototype.toExponential 不一样的地方是，该方法区分正负 0
+   */
+  toExponential(): string
+  toExponential(fractionDigits: number): string
+  toExponential(printOptions: ToExponentialOptions): string
+  toExponential(arg?: number | ToExponentialOptions): string {
+    if (this.isNaN()) return 'NaN'
+    if (this.isInfinity()) return this.isNeg() ? '-Infinity' : 'Infinity'
+    let fd: number | undefined
+    let opt: ToExponentialOptions
+    if (typeof arg === 'number') {
+      fd = arg
+      opt = {}
+    } else if (arg) {
+      opt = arg as ToExponentialOptions
+      fd = opt.fractionDigits
+    } else {
+      opt = {}
+    }
+
+    if (this.isZero()) {
+      let str = `${this.isNeg() ? '-' : ''}0`
+      if (fd) str += '.' + _repeat('0', fd)
+      str += 'e+0'
+      return str
+    }
+
+    const decimal = fd != null ? this.clone().setPrecision(fd + 1, opt.rounding) : this
+    return _printExp(decimal, fd ? fd + 1 : void 0)
   }
 
   /**
    * 打印结果字符串
+   * 注意：与 Number.prototype.toString 不一样的地方是，该方法区分正负 0
    */
   toString(): string {
     if (this.isNaN()) return 'NaN'
     if (this.isInfinity()) return this.isNeg() ? '-Infinity' : 'Infinity'
     if (this.isZero()) return this.isNeg() ? '-0' : '0'
 
-    const digits: any[] = this.toArray()
-    // 存在小数点
-    if (this.getDecimalPlaces()) {
-      if (digits[0] === 0) {
-        digits.splice(1, 0, '.')
-      } else {
-        digits.splice(this.dpp, 0, '.')
-      }
+    // TODO, 是否需要？
+    const decimal = this.clone().setPrecision(Setting.precision, Setting.rounding)
+    return _print(
+      decimal,
+      Setting.expThresholdPos,
+      Setting.expThresholdNeg,
+      void 0
+    )
+  }
+
+  /**
+   * 设置正负值
+   */
+  _setNeg(v: boolean): this {
+    if (v) {
+      this.flag |= Flag.Neg
+    } else if (this.flag & Flag.Neg) {
+      this.flag ^= Flag.Neg
     }
-    return (this.isNeg() ? '-' : '') + digits.join('')
+    return this
+  }
+
+  /**
+   * 反转正负数
+   */
+  _toggleNeg(): this {
+    this._setNeg(!this.isNeg())
+    return this
+  }
+
+  /**
+   * 移动 dpp
+   */
+  _moveDpp(n: number) {
+    if (this._digitCount()) this.dpp += n
+    return this
+  }
+
+  /** 有多少位有效小数 */
+  _getFractionCount(): number {
+    const n = this._digitCount() - this.dpp
+    return n > 0 ? n : 0
+  }
+
+  /**
+   * 有多少位整数
+   * 取值大于等于 1（0.x 算 1 个整数 0）
+   */
+  _getIntegerCount(): number {
+    return this.dpp > 0 ? this.dpp : 1
+  }
+
+  _indexRange(): [number, number] {
+    const begin = -this._getFractionCount()
+    const end = this._getIntegerCount() - 1
+    return [begin, end]
+  }
+
+  _digitCount(): number {
+    return this.digits.length
+  }
+
+  _getDigit(index: number) {
+    return this.digits[index] ?? 0
+  }
+
+  _setDigit(index: number, value: number) {
+    this.digits[index] = value
+    return this
+  }
+
+  _sliceDigits(significantDigits: number) {
+    this.digits.length = significantDigits
+    return this
+  }
+  
+  _joinDigits(): string {
+    return this.digits.join('')
+  }
+
+  _appendFront(value: number) {
+    this.digits.unshift(value)
+    return this
+  }
+
+  _appendBack(value: number) {
+    this.digits.push(value)
+    return this
+  }
+
+  _popBack() {
+    return this.digits.pop()
+  }
+
+  _popFront() {
+    return this.digits.shift()
+  }
+
+  /**
+   * 0 为个位数，1 为十位数…
+   * -1 为小数第一位，-2 为小数第二位…
+   */
+  _get(index: number): number {
+    return this._getDigit(this.dpp - 1 - index)
+  }
+
+  /**
+   * 从左往右算，小数点的位置
+   */
+  _getPoint(): number {
+    return this.dpp
   }
 }
+
 export type t = Decimal
+
+function _print(
+  decimal: Decimal,
+  expThresholdPos?: number,
+  expThresholdNeg?: number,
+  significantDigits?: number
+): string {
+  let str = decimal.isNeg() ? '-' : ''
+  const expThreshold = decimal.dpp <= 0 ? expThresholdNeg ?? Setting.expThresholdNeg : expThresholdPos ?? Setting.expThresholdPos
+  const digitCount = decimal._digitCount()
+  const dpp = decimal.dpp
+
+  // 1. 包含达到阈值的前置 0 的小数
+  // -> n.n...e-n...，如 0.1 -> 1e-1, 0.01 -> 1e-2
+  // 注意：dpp 从 0 开始代表小数，而 expThreshold 从 -1 开始
+  if (dpp <= 0 && (dpp - 1) <= expThreshold) {
+    return _printExp(decimal, significantDigits)
+  }
+
+  // 2. 
+  // 2.1 包含达到阈值位数的整数
+  // 2.2 或者如果指定了精度，且整数部分长度超过精度，需要裁剪并用指数形式展示
+  // -> n.n...e+n...
+  if (dpp >= 1 && dpp - 1 >= expThreshold || (significantDigits && decimal._getIntegerCount() > significantDigits)) {
+    return _printExp(decimal, significantDigits)
+  }
+
+  // 3. 小数
+  if (dpp <= 0) {
+    str += '0.' + _repeat('0', -dpp)
+    // decimal 传入前已经裁剪好 digits，直接拼接即可
+    str += decimal._joinDigits()
+    // 如果指定了 significantDigits，则如果长度不够，末尾使用 0 来补足
+    if (significantDigits) {
+      str += _repeat('0', significantDigits - digitCount)
+    }
+    return str
+  }
+
+  // 4. 整数或者同时包含整数、小数
+  if (significantDigits) {
+    let i = -1
+    while (++i < significantDigits) {
+      if (dpp === i) str += '.'
+      str += decimal._getDigit(i)
+    }
+  } else {
+    const [begin, end] = decimal._indexRange()
+    let i = end + 1
+    while (--i >= 0) {
+      str += decimal._get(i)
+    }
+    if (begin < 0) {
+      str += '.'
+      let i = 0
+      while (i-- > begin) {
+        str += decimal._get(i)
+      }
+    }
+  }
+
+  return str
+}
+
+function _printExp(
+  decimal: Decimal,
+  significantDigits?: number
+): string {
+  let str = (decimal.isNeg() ? '-' : '') + decimal._getDigit(0)
+
+  // 明确指定了 significantDigits（如 toPrecision 场景），则小数点后，保留足够的位数（不够用 0 补）
+  if (significantDigits) {
+    if (significantDigits > 1) {
+      str += '.'
+      let i = 0
+      while (++i < significantDigits) {
+        str += decimal._getDigit(i)
+      }
+    }
+  }
+
+  // 没有指定 significantDigits（如 toString 场景），则有多少拼多少
+  else {
+    const digitCount = decimal._digitCount()
+    if (digitCount > 1) {
+      str += '.'
+      let i = 0
+      while (++i < digitCount) {
+        str += decimal._getDigit(i)
+      }
+    }
+  }
+
+  str += (decimal.dpp <= 0 ? 'e' : 'e+') + String(decimal.dpp - 1)
+
+  return str
+}
+
+function _repeat(str: string, n: number): string {
+  if (n < 1) return ''
+  let ret = str
+  while (--n) ret += str
+  return ret
+}

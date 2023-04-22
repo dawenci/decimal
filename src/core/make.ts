@@ -8,7 +8,7 @@ const enum Code {
   Minus = 45,
 }
 
-function parse(raw: unknown): DecimalData {
+function parse(raw: any): DecimalData {
   const obj: DecimalData = { flag: 0, dpp: 0, digits: [] }
 
   if (raw == null || raw !== raw || raw === '') {
@@ -23,6 +23,7 @@ function parse(raw: unknown): DecimalData {
 
   // 统一成 string
   let str = String(raw).replace(/\s+/g, '').toLowerCase()
+  if (str[0] === '+') str = str.slice(1)
   if (str[0] === '.') str = '0' + str
   const len = str.length
 
@@ -35,13 +36,13 @@ function parse(raw: unknown): DecimalData {
     return obj
   }
 
-  let neg = str.charCodeAt(0) === Code.Neg
+  const neg = str.charCodeAt(0) === Code.Neg
   let nan = false
   let hasDp = false
   let dpp = 0
   let exp = 0
 
-  let digits: number[] = []
+  const digits: number[] = []
 
   let i = neg ? 1 : 0
   main: while (i < len) {
@@ -172,11 +173,17 @@ export function make(raw?: unknown): Decimal {
   return new Decimal(init.digits, init.dpp, init.flag)
 }
 
-export function make2(digits: number[], dpp: number, flag: number): Decimal {
+export function make_by_data(digits: number[], dpp: number, flag: number): Decimal {
   const ret = new Decimal(digits, dpp, flag)
   strip_zeros(ret)
   return ret
 }
+
+// TODO hex
+// export function of_hex(str: string): Decimal
+
+// TODO binary
+// export function of_binary(str: string): Decimal
 
 export const NAN = Object.freeze(make(NaN))
 export const INFINITY = Object.freeze(make(Infinity))

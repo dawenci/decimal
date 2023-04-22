@@ -13,8 +13,5 @@
     "outDir": "dist",
     "lib": ["DOM", "ESNext", ],
   },
-  "include": [
-    "src",
-    "types",
-  ],
+  "include": ["src", "types"],
 }
